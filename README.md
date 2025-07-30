@@ -19,6 +19,18 @@ Idea based on datastar and fixi.js
 3. **Dual SSE Messages**: Server sends HTML updates followed by JavaScript execution commands
 4. **Client SSE Handler**: EventSource processes both `html` updates (DOM replacement) and `js` updates (variable assignment or code execution)
 
+## SSE Message Types
+
+The SSE handler processes structured JSON messages to control client behavior:
+
+| Message Type | Format | Example | Description |
+|--------------|--------|---------|-------------|
+| **HTML Update** | `{"html": {"elementId": "htmlContent"}}` | `{"html": {"posts": "<li>New post</li>"}}` | Replaces DOM element content by ID |
+| **JS Variable** | `{"js": {"varName": value}}` | `{"js": {"userCount": 42}}` | Sets `window.varName = value` |
+| **JS Execution** | `{"js": {"exec": "code"}}` | `{"js": {"exec": "alert('Hello!')"}}` | Executes JavaScript code |
+
+Multiple messages can be sent in sequence from a single endpoint, allowing complex client orchestration like updating multiple DOM elements followed by form resets or notifications.
+
 The SSE message handler supports two JavaScript patterns: `{"js": {"varName": value}}` for setting window variables, and `{"js": {"exec": "code"}}` for executing JavaScript commands. This pairs beautifully with HTMX's SSE plugin, providing excellent locality of behavior where server-sent messages directly control specific client actions. The approach maintains hypermedia compliance by having the server orchestrate all client-side behavior through structured data rather than requiring complex client-side logic.
 
 <img src="https://raw.githubusercontent.com/RetributionByRevenue/fastapi-template-SSE-Engine-MVC-/refs/heads/main/screenshot.gif">
