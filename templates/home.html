@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <h1>Welcome {{ user.username }}!</h1>
+    <p>Session ID: {{ user.sessionId }}</p>
+    <p>{{ user.initialContent }}</p>
+
+    <h2>Add New Post:</h2>
+    <form id="addPostForm" hx-post="/add_post" hx-trigger="submit" hx-swap="none">
+        <input type="text" name="post_content" placeholder="Enter your post..." required>
+        <button type="submit">Add Post</button>
+    </form>
+
+    <h2>Your Posts:</h2>
+
+    {% if user.btnPressed == False %}
+        <button id="btn_{{ user.username }}" onclick="fetch('/generate_post/')" type="button">Update HTML Element</button>
+    {% else %}
+        <button id="btn_{{ user.username }}" onclick="fetch('/generate_post/')" type="button" disabled>Update HTML Element</button>
+    {% endif %}
+
+    <ol id="ol_{{ user.username }}">
+        {% for post in user.posts %}
+            <li>{{ post }}</li>
+        {% endfor %}
+    </ol>
+    
+    <hr>
+    <button onclick="window.location.href='/logout'">Logout</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const username = '{{ user.username }}';  
+            if (window.eventSource) {
+                window.eventSource.close();
+            }
+            window.eventSource = new EventSource(`/stream/${username}`);
+            window.eventSource.onmessage = (event) => {
+                try {
+                    const update = JSON.parse(event.data);
+                    if (update.js) {
+                        Object.entries(update.js).forEach(([key, value]) => {
+                            if (key === 'exec') {
+                                // Execute JavaScript code
+                                eval(value);
+                                console.log(`Executed JS:`, value);
+                            } else {
+                                // Set window variables
+                                window[key] = value;
+                                console.log(`Updated JS variable ${key}:`, value);
+                            }
+                        });
+                    }
+                    if (update.html) {
+                        Object.entries(update.html).forEach(([elementId, htmlContent]) => {
+                            const element = document.getElementById(elementId);
+                            if (element) {
+                                const doUpdate = () => {
+                                    const temp = document.createElement('div');
+                                    temp.innerHTML = htmlContent;
+                                    const newElement = temp.querySelector(element.tagName);
+                                    if (newElement) {
+                                        while (element.firstChild) {
+                                            element.removeChild(element.firstChild);
+                                        }
+                                        while (newElement.firstChild) {
+                                            element.appendChild(newElement.firstChild);
+                                        }
+                                        const originalId = element.id;
+                                        while (element.attributes.length > 0) {
+                                            element.removeAttribute(element.attributes[0].name);
+                                        }
+                                        element.id = originalId;
+                                        Array.from(newElement.attributes).forEach(attr => {
+                                            if (attr.name !== 'id') {
+                                                element.setAttribute(attr.name, attr.value);
+                                            }
+                                        });
+                                        console.log(`Updated ${element.tagName} element ${elementId}`);
+                                    } else {
+                                        console.warn(`Matching element type not found in new content for ${elementId}`);
+                                    }
+                                };
+                                if (document.startViewTransition) {
+                                    document.startViewTransition(() => doUpdate());
+                                } else {
+                                    doUpdate();
+                                }
+                            } else {
+                                console.warn(`Element with id ${elementId} not found`);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                    console.error('Raw data:', event.data);
+                }
+            };
+            window.eventSource.onerror = (error) => {
+                console.error('SSE Error:', error);
+                window.eventSource.close();
+                setTimeout(() => {
+                    window.eventSource = new EventSource(`/stream/${username}`);
+                }, 5000);
+            };
+
+        });
+    </script>
+{% endblock %}
